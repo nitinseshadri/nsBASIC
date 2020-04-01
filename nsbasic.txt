@@ -1,0 +1,250 @@
+// nsBASIC
+// The tiniest BASIC-like interpreter
+// By Nitin Seshadri
+
+// Implementation progress
+
+print (implemented)
+goto (stub)
+list (implemented, buggy)
+run (stub)
+rem (implemented)
+
+line numbers (implemented, buggy)
+load (stub)
+save (stub)
+new (implemented)
+
+poke (stub)
+peek (stub)
+
+clear/cls (stub)
+line (stub)
+circle (stub)
+
+// (Somewhat) working snapshot
+
+// nsBASIC
+// The tiniest BASIC-like interpreter
+// By Nitin Seshadri
+
+#include <EEPROM.h>
+
+// Options
+const int baudrate = 9600; // Serial baud rate (default 9600)
+const String startupMsg = "*** nsbasic v0.1 ***\n\n"; // Startup message with version
+const String prompt = "ready.\n"; // Command prompt
+const String errorMsg = "?syntax error\n"; // Error message
+
+// Variables
+int echo = 1; // System option to display prompt and echo keyboard input to the screen
+char *input = ""; // Input line
+int error = 0; // Error status
+char prog[16][18]; // 2-d array to store program in RAM (Nitin please adjust size)
+
+// Other stuff
+char *append_char ( char *s, char c ) {
+  // This is probably very bad code but it works for now
+  size_t len = strlen(s);
+  char *ret = new char[len + 2];
+  strcpy(ret,s);
+  ret[len] = c;
+  ret[len + 1] = '\0';
+  return ret;
+}
+
+void setup()
+{
+  Serial.begin(baudrate);
+  while (!Serial); // Wait for serial to get ready
+  Serial.print(startupMsg);
+  if (echo) {
+    Serial.print(prompt);
+  }
+}
+
+void loop()
+{
+  if (Serial.available() > 0) {
+    char c = Serial.read();
+    if (c == ';' || c == '\n') {
+      if (echo) {
+        Serial.print("\n");
+      }
+      
+      // Giant, unwieldy switch to parse commands
+      switch (input[0]) {
+        case '?': // print alias
+          if (strlen(input) > 2 && input[1] == '"' && input[strlen(input)-1] == '"') {
+            for (int i=2; i<strlen(input)-1; i++) {
+              Serial.print(input[i]);
+            }
+            Serial.print('\n');
+          } else {
+            error = 1;
+          }
+          break;
+        case 'P': // print, peek, or poke
+        case 'p':
+          switch (input[1]) {
+            case 'R': // print
+            case 'r':
+              if (strlen(input) > 7 && input[6] == '"' && input[strlen(input)-1] == '"') {
+                for (int i=7; i<strlen(input)-1; i++) {
+                  Serial.print(input[i]);
+                }
+              Serial.print('\n');
+              } else {
+                error = 1;
+              }
+              break;
+            case 'E': // peek
+            case 'e':
+              Serial.println("Peek not implemented yet");
+              break;
+            case 'O': // poke
+            case 'o':
+              Serial.println("Poke not implemented yet");
+              break;
+            default:
+              error = 1;
+              break;
+          }
+          break;
+        case '\'': // rem alias
+          break;
+        case 'R': // rem or run
+        case 'r':
+          switch (input[1]) {
+            case 'E': // rem
+            case 'e':
+              break;
+            case 'U': // run
+            case 'u':
+              for (int i=0; i<16; i++) {
+                if (prog[i][0] != '\0') {
+                  strcpy(input,prog[i]);
+                  // Then run this line
+                }
+              }
+              break;
+            default:
+              error = 1;
+              break;
+          }
+          break;
+        case 'G': // goto
+        case 'g':
+          Serial.println("Goto not implemented yet");
+          break;
+        case 'L': // list, load, or line
+        case 'l':
+          switch (input[1]) {
+            case 'I': // list or line
+            case 'i':
+              switch (input[2]) {
+                case 'N': // line
+                case 'n':
+                  Serial.println("Line not implemented yet");
+                  break;
+                case 'S': // list
+                case 's':
+                  for (int i=0; i<16; i++) {
+                    if (prog[i][0] != '\0') {
+                      Serial.println(prog[i]);
+                    }
+                  }
+                  break;
+                default:
+                  error = 1;
+                  break;
+              }
+              break;
+            case 'O': // load
+            case 'o':
+              for (int i=0; i<EEPROM.length()-1; i++) {
+                Serial.print('.'); // Progress bar
+              }
+              Serial.print('\n');
+              break;
+            default:
+              error = 1;
+              break;
+          }
+          break;
+        case 'S': // save
+        case 's':
+          for (int i=0; i<EEPROM.length()-1; i++) {
+            EEPROM.update(i,i); // Update rather than write to preserve EEPROM life
+            Serial.print('.'); // Progress bar
+          }
+          Serial.print('\n');
+          break;
+        case 'C': // cls or circle
+        case 'c':
+          switch (input[1]) {
+            case 'L': // cls/clear
+            case 'l':
+              Serial.println("Clear screen not implemented yet");
+              break;
+            case 'I': // circle
+            case 'i':
+              Serial.println("Circle not implemented yet");
+              break;
+            default:
+              error = 1;
+              break;
+          }
+          break;
+        case 'N': // new
+        case 'n':
+          memset(prog, 0, sizeof(prog[0][0]) * 16 * 16);
+          break;
+        case '0': // line numbers
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        { // Apparently I need to create a new scope
+          char *buf;
+          if (strlen(input) > 15) {
+            Serial.println(F("?line length error"));
+            break;
+          }
+          strcpy(buf,input); // copy the input somewhere
+          char *p = strtok(input," "); // get the line number
+          int ln = atoi(p); // set line number as int
+          if (ln > 15) {
+            Serial.println(F("?line number error"));
+            break;
+          }
+          strcpy(prog[ln],buf); // finally store the command in the array
+          free(buf);
+        }
+          break;
+        default:
+          error = 1;
+          break;
+      }
+
+      if (error) {
+        Serial.print(errorMsg);
+        error = 0;
+      }
+      input = "";
+      if (echo) {
+        Serial.print(prompt);
+      }
+    } else {
+      input = append_char(input,c);
+      if (echo) {
+        Serial.print(c);
+      }
+    }
+  }
+}
